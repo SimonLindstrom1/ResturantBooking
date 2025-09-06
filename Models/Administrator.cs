@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace ResturantBooking.Models
+namespace RestaurantBooking.Models
 {
-    public class Admin
+    public class Administrator
     {
         public int Id { get; set; }
 

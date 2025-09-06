@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 
-namespace ResturantBooking.Models
+namespace RestaurantBooking.Models
 {
     public class MenuItem
     {
