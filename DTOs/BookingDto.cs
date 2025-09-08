@@ -46,4 +46,4 @@ namespace RestaurantBooking.DTOs
         public string CustomerPhoneNumber { get; set; } = string.Empty;
     }
 }
-}
+

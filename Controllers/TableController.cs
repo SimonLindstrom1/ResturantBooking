@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RestaurantBooking.Data;
 using RestaurantBooking.DTOs;
+using RestaurantBooking.Models;
 
 namespace RestaurantBooking.Controllers
 {
