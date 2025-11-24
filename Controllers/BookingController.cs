@@ -9,7 +9,6 @@ namespace RestaurantBooking.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
     public class BookingsController : ControllerBase
     {
         private readonly RestaurantContext _context;
@@ -47,6 +46,8 @@ namespace RestaurantBooking.Controllers
         }
 
         [HttpPost]
+        [AllowAnonymous]
+
         public async Task<IActionResult> CreateBooking([FromBody] CreateBookingDto bookingDto)
         {
             try
@@ -83,5 +84,20 @@ namespace RestaurantBooking.Controllers
 
             return Ok(availableTables);
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteBooking(int id)
+        {
+            var booking = await _context.Bookings.FindAsync(id);
+
+            if (booking == null)
+                return NotFound(new { message = "Booking not found" });
+
+            _context.Bookings.Remove(booking);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Booking deleted successfully" });
+        }
     }
 }
+

@@ -4,6 +4,8 @@ namespace RestaurantBooking.Models
 {
     public class Administrator
     {
+        internal string Email;
+
         public int Id { get; set; }
 
         [Required]

@@ -9,20 +9,29 @@ using RestaurantBooking.Data;
 using RestaurantBooking.Services;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 namespace RestaurantBooking
 {
     public class Program
     {
         public static async Task Main(string[] args)
         {
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                Console.WriteLine("UNHANDLED EXCEPTION: " + e.ExceptionObject);
+            };
             var builder = WebApplication.CreateBuilder(args);
+            Console.WriteLine(">>> STARTUP SECRET KEY: " + builder.Configuration["Jwt:SecretKey"]);
+            Console.WriteLine(">>> STARTUP ISSUER: " + builder.Configuration["Jwt:Issuer"]);
+            Console.WriteLine(">>> STARTUP AUDIENCE: " + builder.Configuration["Jwt:Audience"]);
 
             // Enhanced service configuration
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
                 {
                     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-                    options.JsonSerializerOptions.WriteIndented = true;
+                    options.JsonSerializerOptions.WriteIndented = true;                   
+                    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
                 });
 
             builder.Services.AddEndpointsApiExplorer();
@@ -251,6 +260,7 @@ namespace RestaurantBooking
                     logger.LogWarning("Continuing in development mode despite database initialization failure");
                 }
             }
+            Console.WriteLine("ENV: " + builder.Environment.EnvironmentName);
 
             app.Run();
         }

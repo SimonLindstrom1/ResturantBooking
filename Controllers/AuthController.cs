@@ -42,6 +42,8 @@ namespace RestaurantBooking.Controllers
 
         private string GenerateJwtToken(Administrator admin)
         {
+            Console.WriteLine("SECRET KEY: " + _configuration["Jwt:SecretKey"]);
+
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

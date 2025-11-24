@@ -1,7 +1,7 @@
-﻿using RestaurantBooking.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using RestaurantBooking.Data;
 using RestaurantBooking.DTOs;
 using RestaurantBooking.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace RestaurantBooking.Services
 {
@@ -14,23 +14,96 @@ namespace RestaurantBooking.Services
             _context = context;
         }
 
-        public async Task<List<AvailableTableDto>> GetAvailableTablesAsync(DateTime date, TimeSpan time, int numberOfGuests)
+        // ===========================================
+        // CREATE BOOKING
+        // ===========================================
+        public async Task<Booking> CreateBookingAsync(CreateBookingDto dto)
         {
-            var requestedDateTime = date.Date.Add(time);
-            var endTime = requestedDateTime.AddHours(2);
+            var start = dto.BookingDate.Date + dto.BookingTime;
+            var end = start.AddHours(2);
 
-            // Find tables with sufficient capacity
-            var suitableTables = await _context.Tables
-                .Where(t => t.Capacity >= numberOfGuests)
+            // Load ALL bookings for that table (avoid EF DateTime translation issues)
+            var tableBookings = await _context.Bookings
+                .Where(b => b.TableId == dto.TableId)
                 .ToListAsync();
 
-            var availableTables = new List<AvailableTableDto>();
-
-            foreach (var table in suitableTables)
+            // Convert existing bookings to real DateTime ranges in memory
+            foreach (var b in tableBookings)
             {
-                if (await IsTableAvailableAsync(table.Id, date, time))
+                var existingStart = b.BookingDate.Date + b.BookingTime;
+                var existingEnd = existingStart.AddHours(2);
+
+                if (existingStart < end && start < existingEnd)
                 {
-                    availableTables.Add(new AvailableTableDto
+                    throw new InvalidOperationException("Table is not available at this time.");
+                }
+            }
+
+            // Find or create customer
+            var customer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.PhoneNumber == dto.CustomerPhoneNumber);
+
+            if (customer == null)
+            {
+                customer = new Customer
+                {
+                    Name = dto.CustomerName,
+                    PhoneNumber = dto.CustomerPhoneNumber
+                };
+
+                _context.Customers.Add(customer);
+            }
+
+            var booking = new Booking
+            {
+                BookingDate = dto.BookingDate.Date,
+                BookingTime = dto.BookingTime,
+                NumberOfGuests = dto.NumberOfGuests,
+                TableId = dto.TableId,
+                Customer = customer
+            };
+
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
+
+            return booking;
+        }
+
+        // ===========================================
+        // GET AVAILABLE TABLES
+        // ===========================================
+        public async Task<List<AvailableTableDto>> GetAvailableTablesAsync(DateTime date, TimeSpan time, int guests)
+        {
+            var start = date.Date + time;
+            var end = start.AddHours(2);
+
+            // Load tables
+            var tables = await _context.Tables
+                .Where(t => t.Capacity >= guests)
+                .ToListAsync();
+
+            // Load all bookings for the date (raw values)
+            var bookings = await _context.Bookings
+                .Where(b => b.BookingDate.Date == date.Date)
+                .ToListAsync();
+
+            var available = new List<AvailableTableDto>();
+
+            foreach (var table in tables)
+            {
+                bool conflict = bookings.Any(b =>
+                {
+                    if (b.TableId != table.Id) return false;
+
+                    var existingStart = b.BookingDate.Date + b.BookingTime;
+                    var existingEnd = existingStart.AddHours(2);
+
+                    return existingStart < end && start < existingEnd;
+                });
+
+                if (!conflict)
+                {
+                    available.Add(new AvailableTableDto
                     {
                         Id = table.Id,
                         TableNumber = table.TableNumber,
@@ -39,63 +112,7 @@ namespace RestaurantBooking.Services
                 }
             }
 
-            return availableTables;
-        }
-
-        public async Task<bool> IsTableAvailableAsync(int tableId, DateTime date, TimeSpan time)
-        {
-            var requestedStart = date.Date.Add(time);
-            var requestedEnd = requestedStart.AddHours(2);
-
-            // Check for overlapping bookings
-            var overlappingBookings = await _context.Bookings
-                .Where(b => b.TableId == tableId && b.BookingDate.Date == date.Date)
-                .Where(b =>
-                    // Existing booking starts before requested end AND ends after requested start
-                    b.BookingDate.Add(b.BookingTime) < requestedEnd &&
-                    b.BookingDate.Add(b.BookingTime).Add(b.Duration) > requestedStart)
-                .AnyAsync();
-
-            return !overlappingBookings;
-        }
-
-        public async Task<Booking> CreateBookingAsync(CreateBookingDto bookingDto)
-        {
-            // Check if table is available
-            if (!await IsTableAvailableAsync(bookingDto.TableId, bookingDto.BookingDate, bookingDto.BookingTime))
-            {
-                throw new InvalidOperationException("Table is not available at the requested time.");
-            }
-
-            // Find or create customer
-            var customer = await _context.Customers
-                .FirstOrDefaultAsync(c => c.PhoneNumber == bookingDto.CustomerPhoneNumber);
-
-            if (customer == null)
-            {
-                customer = new Customer
-                {
-                    Name = bookingDto.CustomerName,
-                    PhoneNumber = bookingDto.CustomerPhoneNumber
-                };
-                _context.Customers.Add(customer);
-                await _context.SaveChangesAsync();
-            }
-
-            // Create booking
-            var booking = new Booking
-            {
-                BookingDate = bookingDto.BookingDate,
-                BookingTime = bookingDto.BookingTime,
-                NumberOfGuests = bookingDto.NumberOfGuests,
-                TableId = bookingDto.TableId,
-                CustomerId = customer.Id
-            };
-
-            _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync();
-
-            return booking;
+            return available;
         }
     }
 }
